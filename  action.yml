@@ -11,9 +11,44 @@ inputs:
     description: Your Cortex API key
     required: true
   backend-url:
-    description: Your Cortex backend URL
+    description: Your Pervaziv backend URL
     required: true
+  console-url:
+    description: Your Pervaziv console base URL
+    required: false
+    default: 'https://console.pervaziv.com'
 
 runs:
   using: node20
   main: dist/index.js
+```
+
+---
+
+**What the Actions tab will show when user clicks the run:**
+```
+🔍 Cortex Code Review
+┌─────────────────┬──────────────────────────────┐
+│ Field           │ Value                        │
+├─────────────────┼──────────────────────────────┤
+│ 📁 Repository   │ org/repo                     │
+│ 🌿 Branch       │ feature/my-branch            │
+│ 🔀 PR           │ #42                          │
+│ 👤 Triggered by │ John Doe (john@company.com)  │
+│ 🏢 Owner        │ My Org (organization)        │
+│ 📝 Files Changed│ 12                           │
+│ ⚡ Trigger      │ pr_opened                    │
+└─────────────────┴──────────────────────────────┘
+
+📊 Scan Results
+┌──────────────────┬───────┐
+│ Metric           │ Count │
+├──────────────────┼───────┤
+│ 🔴 Critical      │ 2     │
+│ 🟡 Warnings      │ 5     │
+│ 🔵 Suggestions   │ 8     │
+│ ✅ Passed Checks │ 34    │
+└──────────────────┴───────┘
+
+👉 View Full Results
+View Full Scan Results on Pervaziv Console →
