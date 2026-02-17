@@ -1,0 +1,19 @@
+name: Cortex Code Review
+description: AI-powered code review bot that scans PR changes and posts inline comments
+author: YourCompany
+
+branding:
+  icon: code
+  color: blue
+
+inputs:
+  cortex-api-key:
+    description: Your Cortex API key
+    required: true
+  backend-url:
+    description: Your Cortex backend URL
+    required: true
+
+runs:
+  using: node20
+  main: dist/index.js
