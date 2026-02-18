@@ -1,0 +1,14 @@
+name: Cortex Code Review
+description: Send PR info to Cortex backend
+
+inputs:
+  cortex-api-key:
+    required: true
+  backend-url:
+    required: true
+  console-url:
+    required: true
+
+runs:
+  using: node20
+  main: dist/index.js
