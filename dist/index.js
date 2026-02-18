@@ -31984,7 +31984,6 @@ async function run() {
         trigger_type: triggerType,
         provider: 'github',
         github_token: token,
-        cortex_api_key: apiKey,
         repository: `${context.repo.owner}/${context.repo.repo}`,
         branch: branch,
         commit: context.sha,
