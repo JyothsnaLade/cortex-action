@@ -32031,40 +32031,46 @@ async function run() {
 
     // Upload SARIF to Security tab
     if (result.issues && result.issues.length > 0) {
-      const sarif = {
-        version: "2.1.0",
-        runs: [{
-          tool: {
-            driver: {
-              name: "Cortex Code Review",
-              rules: []
-            }
-          },
-          results: result.issues.map(issue => ({
-            ruleId: issue.rule_id,
-            message: { text: issue.message },
-            level: issue.severity, // "error", "warning", "note"
-            locations: [{
-              physicalLocation: {
-                artifactLocation: { uri: issue.filename },
-                region: { startLine: issue.line }
-              }
-            }]
-          }))
+  const sarif = {
+    version: "2.1.0",
+    runs: [{
+      tool: {
+        driver: {
+          name: "Cortex Code Review",
+          rules: []
+        }
+      },
+      results: result.issues.map(issue => ({
+        ruleId: issue.rule_id,
+        message: { text: issue.message },
+        level: issue.severity,
+        locations: [{
+          physicalLocation: {
+            artifactLocation: { uri: issue.filename },
+            region: { startLine: issue.line }
+          }
         }]
-      };
+      }))
+    }]
+  };
 
-      await octokit.rest.codeScanning.uploadSarif({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        commit_sha: context.sha,
-        ref: `refs/heads/${branch}`,
-        sarif: Buffer.from(JSON.stringify(sarif)).toString('base64'),
-        tool_name: 'Cortex Code Review'
-      });
+  // GitHub requires gzip compressed then Base64 encoded SARIF
+  const zlib = __nccwpck_require__(3106);
+  const sarifGzipped = zlib.gzipSync(JSON.stringify(sarif));
+  const sarifBase64 = sarifGzipped.toString('base64');
 
-      console.log('SARIF uploaded to Security tab successfully');
-    }
+  await octokit.rest.codeScanning.uploadSarif({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    commit_sha: context.sha,
+    ref: `refs/heads/${branch}`,
+    sarif: sarifBase64,
+    tool_name: 'Cortex Code Review'
+  });
+
+  console.log('SARIF uploaded to Security tab successfully');
+}
+     
 
     // Update job summary with scan results
     await core.summary
