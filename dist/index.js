@@ -32031,16 +32031,16 @@ async function run() {
 
     // Update job summary with scan results
     await core.summary
-      .addHeading('🔍 Cortex Code Review', 1)
+      .addHeading(' Cortex Code Review', 1)
       .addTable([
         [{ data: 'Field', header: true }, { data: 'Value', header: true }],
-        ['📁 Repository', repoData.full_name],
-        ['🌿 Branch', branch],
-        ['🔀 PR', `#${prNumber}`],
-        ['👤 Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
-        ['🏢 Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
-        ['📝 Files Changed', String(changedFiles.length)],
-        ['⚡ Trigger', triggerType]
+        ['Repository', repoData.full_name],
+        ['Branch', branch],
+        ['PR', `#${prNumber}`],
+        ['Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
+        ['Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
+        ['Files Changed', String(changedFiles.length)],
+        ['Trigger', triggerType]
       ])
       .addHeading('Scan Results', 2)
       .addTable([
@@ -32050,7 +32050,7 @@ async function run() {
         ['Suggestions', String(result.suggestions || 0)],
         ['Passed Checks', String(result.passed || 0)]
       ])
-      .addHeading('👉 View Full Results', 2)
+      .addHeading('View Full Results', 2)
       .addLink('View Full Scan Results on Pervaziv Console →', fullConsoleUrl)
       .write();
 
