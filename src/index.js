@@ -6,8 +6,7 @@ async function run() {
     const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
     const context = github.context;
-    const apiKey = core.getInput('cortex-api-key');
-    const backendUrl = core.getInput('backend-url');
+    const backendUrl = 'https://trudi-synoptistic-meanspiritedly.ngrok-free.dev/runBotScan';;
     const consoleUrl = core.getInput('console-url');
 
     const eventName = context.eventName;
@@ -149,7 +148,6 @@ async function run() {
         trigger_type: triggerType,
         provider: 'github',
         github_token: token,
-        cortex_api_key: apiKey,
         repository: `${context.repo.owner}/${context.repo.repo}`,
         branch: branch,
         commit: context.sha,
@@ -223,15 +221,14 @@ async function run() {
   const sarifGzipped = zlib.gzipSync(JSON.stringify(sarif));
   const sarifBase64 = sarifGzipped.toString('base64');
 
-  await octokit.rest.codeScanning.uploadSarif({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    commit_sha: context.sha,
-    ref: `refs/heads/${branch}`,
-    sarif: sarifBase64,
-    tool_name: 'Cortex Code Review'
-  });
-
+ await octokit.rest.codeScanning.uploadSarif({
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  commit_sha: context.sha,
+  ref: `refs/heads/${repoData.default_branch}`,  //use main/default branch
+  sarif: sarifBase64,
+  tool_name: 'Cortex Code Review'
+});
   console.log('SARIF uploaded to Security tab successfully');
 }
      

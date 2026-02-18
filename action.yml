@@ -2,12 +2,10 @@ name: Cortex Code Review
 description: Send PR info to Cortex backend
 
 inputs:
-  cortex-api-key:
-    required: true
-  backend-url:
-    required: true
   console-url:
-    required: true
+    description: Pervaziv console URL
+    required: false
+    default: 'https://console.pervaziv.com'
 
 runs:
   using: node20
