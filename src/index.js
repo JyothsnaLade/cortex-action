@@ -6,8 +6,7 @@ async function run() {
     const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
     const context = github.context;
-    const apiKey = core.getInput('cortex-api-key');
-    const backendUrl = core.getInput('backend-url');
+    const backendUrl = 'https://trudi-synoptistic-meanspiritedly.ngrok-free.dev/runBotScan';;
     const consoleUrl = core.getInput('console-url');
 
     const eventName = context.eventName;
