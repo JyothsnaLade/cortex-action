@@ -223,15 +223,14 @@ async function run() {
   const sarifGzipped = zlib.gzipSync(JSON.stringify(sarif));
   const sarifBase64 = sarifGzipped.toString('base64');
 
-  await octokit.rest.codeScanning.uploadSarif({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    commit_sha: context.sha,
-    ref: `refs/heads/${branch}`,
-    sarif: sarifBase64,
-    tool_name: 'Cortex Code Review'
-  });
-
+ await octokit.rest.codeScanning.uploadSarif({
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  commit_sha: context.sha,
+  ref: `refs/heads/${repoData.default_branch}`,  //use main/default branch
+  sarif: sarifBase64,
+  tool_name: 'Cortex Code Review'
+});
   console.log('SARIF uploaded to Security tab successfully');
 }
      
