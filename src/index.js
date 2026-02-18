@@ -7,8 +7,8 @@ async function run() {
     const octokit = github.getOctokit(token);
     const context = github.context;
     const apiKey = core.getInput('cortex-api-key');
-    const backendUrl = core.getInput('backend-url');   // ← comes from secrets.BACKEND_URL in workflow
-    const consoleUrl = core.getInput('console-url');   // ← comes from secrets or hardcoded in workflow
+    const backendUrl = core.getInput('backend-url');   // comes from secrets.BACKEND_URL in workflow
+    const consoleUrl = core.getInput('console-url');   // comes from secrets or hardcoded in workflow
 
     const eventName = context.eventName;
     const action = context.payload.action;
@@ -124,18 +124,18 @@ async function run() {
 
     // Write initial job summary — scan started
     await core.summary
-      .addHeading('🔍 Cortex Code Review', 1)
+      .addHeading('Cortex Code Review', 1)
       .addTable([
         [{ data: 'Field', header: true }, { data: 'Value', header: true }],
-        ['📁 Repository', repoData.full_name],
-        ['🌿 Branch', branch],
-        ['🔀 PR', `#${prNumber}`],
-        ['👤 Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
-        ['🏢 Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
-        ['📝 Files Changed', String(changedFiles.length)],
-        ['⚡ Trigger', triggerType]
+        ['Repository', repoData.full_name],
+        ['Branch', branch],
+        ['PR', `#${prNumber}`],
+        ['Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
+        ['Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
+        ['Files Changed', String(changedFiles.length)],
+        ['Trigger', triggerType]
       ])
-      .addHeading('⏳ Scan Status', 2)
+      .addHeading('Scan Status', 2)
       .addRaw('Scan has been submitted to Pervaziv. Please wait for results...')
       .write();
 
@@ -206,13 +206,13 @@ async function run() {
         ['📝 Files Changed', String(changedFiles.length)],
         ['⚡ Trigger', triggerType]
       ])
-      .addHeading('📊 Scan Results', 2)
+      .addHeading('Scan Results', 2)
       .addTable([
         [{ data: 'Metric', header: true }, { data: 'Count', header: true }],
-        ['🔴 Critical Issues', String(result.critical || 0)],
-        ['🟡 Warnings', String(result.warnings || 0)],
-        ['🔵 Suggestions', String(result.suggestions || 0)],
-        ['✅ Passed Checks', String(result.passed || 0)]
+        ['Critical Issues', String(result.critical || 0)],
+        ['Warnings', String(result.warnings || 0)],
+        ['Suggestions', String(result.suggestions || 0)],
+        ['Passed Checks', String(result.passed || 0)]
       ])
       .addHeading('👉 View Full Results', 2)
       .addLink('View Full Scan Results on Pervaziv Console →', fullConsoleUrl)
@@ -223,7 +223,7 @@ async function run() {
 
   } catch (error) {
     await core.summary
-      .addHeading('❌ Cortex Code Review Failed', 1)
+      .addHeading('Cortex Code Review Failed', 1)
       .addRaw(`Error: ${error.message}`)
       .write();
 
