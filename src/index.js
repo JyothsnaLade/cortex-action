@@ -7,15 +7,14 @@ async function run() {
     const octokit = github.getOctokit(token);
     const context = github.context;
     const apiKey = core.getInput('cortex-api-key');
-    const backendUrl = core.getInput('backend-url');
-    const consoleUrl = core.getInput('console-url');
+    const backendUrl = core.getInput('backend-url');   // ← comes from secrets.BACKEND_URL in workflow
+    const consoleUrl = core.getInput('console-url');   // ← comes from secrets or hardcoded in workflow
 
     const eventName = context.eventName;
     const action = context.payload.action;
 
     console.log(`Event: ${eventName}, Action: ${action}`);
 
-    // Determine trigger type
     let triggerType;
     let prNumber;
     let branch;
@@ -32,7 +31,10 @@ async function run() {
 
     } else if (eventName === 'issue_comment' && action === 'created') {
       const comment = context.payload.comment.body.trim();
-      if (!comment.includes('/Cortex Code review')) {
+      console.log(`Comment received: "${comment}"`);
+
+      // case insensitive check — works for /Cortex Code Review, /cortex code review, etc.
+      if (!comment.toLowerCase().includes('/cortex code review')) {
         console.log('Comment does not match trigger. Skipping.');
         return;
       }
@@ -70,7 +72,7 @@ async function run() {
       patch: f.patch
     }));
 
-    //Fetch triggered user details 
+    // Fetch triggered user details
     const { data: triggerUser } = await octokit.rest.users.getByUsername({
       username: context.actor
     });
@@ -81,7 +83,7 @@ async function run() {
       repo: context.repo.repo
     });
 
-    // Fetch repo owner (org or user) 
+    // Fetch repo owner (org or user)
     let ownerDetails;
     try {
       const { data: orgData } = await octokit.rest.orgs.get({
@@ -120,7 +122,7 @@ async function run() {
       };
     }
 
-    // Writing job summary — scan started 
+    // Write initial job summary — scan started
     await core.summary
       .addHeading('🔍 Cortex Code Review', 1)
       .addTable([
@@ -133,13 +135,13 @@ async function run() {
         ['📝 Files Changed', String(changedFiles.length)],
         ['⚡ Trigger', triggerType]
       ])
-      .addHeading(' Scan Status', 2)
+      .addHeading('⏳ Scan Status', 2)
       .addRaw('Scan has been submitted to Pervaziv. Please wait for results...')
       .write();
 
     console.log(`Calling Pervaziv backend for PR #${prNumber}...`);
 
-    // Call  backend 
+    // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -183,10 +185,7 @@ async function run() {
 
     const result = await response.json();
 
-    // Build console URL
-    // Handles both cases:
-    // 1. Backend returns a scan_url or scan_id in response
-    // 2. console-url input is provided as fixed base URL
+    // Build console URL from backend response
     let fullConsoleUrl = consoleUrl || 'https://console.pervaziv.com';
     if (result.scan_url) {
       fullConsoleUrl = result.scan_url;
@@ -194,28 +193,28 @@ async function run() {
       fullConsoleUrl = `${fullConsoleUrl}/scans/${result.scan_id}`;
     }
 
-    // ── Update job summary with results ────────────────────────────
+    // Update job summary with scan results
     await core.summary
       .addHeading('🔍 Cortex Code Review', 1)
       .addTable([
         [{ data: 'Field', header: true }, { data: 'Value', header: true }],
-        ['Repository', repoData.full_name],
-        ['Branch', branch],
-        ['PR', `#${prNumber}`],
-        ['Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
-        ['Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
-        ['Files Changed', String(changedFiles.length)],
-        ['Trigger', triggerType]
+        ['📁 Repository', repoData.full_name],
+        ['🌿 Branch', branch],
+        ['🔀 PR', `#${prNumber}`],
+        ['👤 Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
+        ['🏢 Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
+        ['📝 Files Changed', String(changedFiles.length)],
+        ['⚡ Trigger', triggerType]
       ])
-      .addHeading('Scan Results', 2)
+      .addHeading('📊 Scan Results', 2)
       .addTable([
         [{ data: 'Metric', header: true }, { data: 'Count', header: true }],
-        ['Critical Issues', String(result.critical || 0)],
-        ['Warnings', String(result.warnings || 0)],
-        ['Suggestions', String(result.suggestions || 0)],
-        ['Passed Checks', String(result.passed || 0)]
+        ['🔴 Critical Issues', String(result.critical || 0)],
+        ['🟡 Warnings', String(result.warnings || 0)],
+        ['🔵 Suggestions', String(result.suggestions || 0)],
+        ['✅ Passed Checks', String(result.passed || 0)]
       ])
-      .addHeading('View Full Results', 2)
+      .addHeading('👉 View Full Results', 2)
       .addLink('View Full Scan Results on Pervaziv Console →', fullConsoleUrl)
       .write();
 
@@ -223,7 +222,6 @@ async function run() {
     console.log(`Console URL: ${fullConsoleUrl}`);
 
   } catch (error) {
-    // Write failure summary 
     await core.summary
       .addHeading('❌ Cortex Code Review Failed', 1)
       .addRaw(`Error: ${error.message}`)

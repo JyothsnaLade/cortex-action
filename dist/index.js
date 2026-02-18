@@ -31843,15 +31843,14 @@ async function run() {
     const octokit = github.getOctokit(token);
     const context = github.context;
     const apiKey = core.getInput('cortex-api-key');
-    const backendUrl = core.getInput('backend-url');
-    const consoleUrl = core.getInput('console-url');
+    const backendUrl = core.getInput('backend-url');   // ← comes from secrets.BACKEND_URL in workflow
+    const consoleUrl = core.getInput('console-url');   // ← comes from secrets or hardcoded in workflow
 
     const eventName = context.eventName;
     const action = context.payload.action;
 
     console.log(`Event: ${eventName}, Action: ${action}`);
 
-    // ── Determine trigger type ──────────────────────────────────────
     let triggerType;
     let prNumber;
     let branch;
@@ -31868,7 +31867,10 @@ async function run() {
 
     } else if (eventName === 'issue_comment' && action === 'created') {
       const comment = context.payload.comment.body.trim();
-      if (!comment.includes('/Cortex Code Review')) {
+      console.log(`Comment received: "${comment}"`);
+
+      // case insensitive check — works for /Cortex Code Review, /cortex code review, etc.
+      if (!comment.toLowerCase().includes('/cortex code review')) {
         console.log('Comment does not match trigger. Skipping.');
         return;
       }
@@ -31891,7 +31893,7 @@ async function run() {
       return;
     }
 
-    // ── Fetch changed files ─────────────────────────────────────────
+    // Fetch changed files
     const { data: files } = await octokit.rest.pulls.listFiles({
       owner: context.repo.owner,
       repo: context.repo.repo,
@@ -31906,18 +31908,18 @@ async function run() {
       patch: f.patch
     }));
 
-    // ── Fetch triggered user details ────────────────────────────────
+    // Fetch triggered user details
     const { data: triggerUser } = await octokit.rest.users.getByUsername({
       username: context.actor
     });
 
-    // ── Fetch repo details ──────────────────────────────────────────
+    // Fetch repo details
     const { data: repoData } = await octokit.rest.repos.get({
       owner: context.repo.owner,
       repo: context.repo.repo
     });
 
-    // ── Fetch repo owner (org or user) ──────────────────────────────
+    // Fetch repo owner (org or user)
     let ownerDetails;
     try {
       const { data: orgData } = await octokit.rest.orgs.get({
@@ -31956,7 +31958,7 @@ async function run() {
       };
     }
 
-    // ── Writing job summary — scan started ──────────────────────────
+    // Write initial job summary — scan started
     await core.summary
       .addHeading('🔍 Cortex Code Review', 1)
       .addTable([
@@ -31975,7 +31977,7 @@ async function run() {
 
     console.log(`Calling Pervaziv backend for PR #${prNumber}...`);
 
-    // ── Call your backend ───────────────────────────────────────────
+    // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -32019,10 +32021,7 @@ async function run() {
 
     const result = await response.json();
 
-    // ── Build console URL ───────────────────────────────────────────
-    // Handles both cases:
-    // 1. Backend returns a scan_url or scan_id in response
-    // 2. console-url input is provided as fixed base URL
+    // Build console URL from backend response
     let fullConsoleUrl = consoleUrl || 'https://console.pervaziv.com';
     if (result.scan_url) {
       fullConsoleUrl = result.scan_url;
@@ -32030,7 +32029,7 @@ async function run() {
       fullConsoleUrl = `${fullConsoleUrl}/scans/${result.scan_id}`;
     }
 
-    // ── Update job summary with results ────────────────────────────
+    // Update job summary with scan results
     await core.summary
       .addHeading('🔍 Cortex Code Review', 1)
       .addTable([
@@ -32059,7 +32058,6 @@ async function run() {
     console.log(`Console URL: ${fullConsoleUrl}`);
 
   } catch (error) {
-    // ── Write failure summary ───────────────────────────────────────
     await core.summary
       .addHeading('❌ Cortex Code Review Failed', 1)
       .addRaw(`Error: ${error.message}`)
