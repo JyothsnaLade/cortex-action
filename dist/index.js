@@ -31843,8 +31843,8 @@ async function run() {
     const octokit = github.getOctokit(token);
     const context = github.context;
     const apiKey = core.getInput('cortex-api-key');
-    const backendUrl = core.getInput('backend-url');   // comes from secrets.BACKEND_URL in workflow
-    const consoleUrl = core.getInput('console-url');   // comes from secrets or hardcoded in workflow
+    const backendUrl = core.getInput('backend-url');
+    const consoleUrl = core.getInput('console-url');
 
     const eventName = context.eventName;
     const action = context.payload.action;
@@ -31869,7 +31869,7 @@ async function run() {
       const comment = context.payload.comment.body.trim();
       console.log(`Comment received: "${comment}"`);
 
-      // case insensitive check — works for /Cortex Code Review, /cortex code review, etc.
+      // case insensitive check
       if (!comment.toLowerCase().includes('/cortex code review')) {
         console.log('Comment does not match trigger. Skipping.');
         return;
@@ -31960,7 +31960,7 @@ async function run() {
 
     // Write initial job summary — scan started
     await core.summary
-      .addHeading('Cortex Code Review', 1)
+      .addHeading('🔍 Cortex Code Review', 1)
       .addTable([
         [{ data: 'Field', header: true }, { data: 'Value', header: true }],
         ['Repository', repoData.full_name],
@@ -31971,7 +31971,7 @@ async function run() {
         ['Files Changed', String(changedFiles.length)],
         ['Trigger', triggerType]
       ])
-      .addHeading('Scan Status', 2)
+      .addHeading('⏳ Scan Status', 2)
       .addRaw('Scan has been submitted to Pervaziv. Please wait for results...')
       .write();
 
@@ -32029,9 +32029,46 @@ async function run() {
       fullConsoleUrl = `${fullConsoleUrl}/scans/${result.scan_id}`;
     }
 
+    // Upload SARIF to Security tab
+    if (result.issues && result.issues.length > 0) {
+      const sarif = {
+        version: "2.1.0",
+        runs: [{
+          tool: {
+            driver: {
+              name: "Cortex Code Review",
+              rules: []
+            }
+          },
+          results: result.issues.map(issue => ({
+            ruleId: issue.rule_id,
+            message: { text: issue.message },
+            level: issue.severity, // "error", "warning", "note"
+            locations: [{
+              physicalLocation: {
+                artifactLocation: { uri: issue.filename },
+                region: { startLine: issue.line }
+              }
+            }]
+          }))
+        }]
+      };
+
+      await octokit.rest.codeScanning.uploadSarif({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        commit_sha: context.sha,
+        ref: `refs/heads/${branch}`,
+        sarif: Buffer.from(JSON.stringify(sarif)).toString('base64'),
+        tool_name: 'Cortex Code Review'
+      });
+
+      console.log('SARIF uploaded to Security tab successfully');
+    }
+
     // Update job summary with scan results
     await core.summary
-      .addHeading(' Cortex Code Review', 1)
+      .addHeading('Cortex Code Review', 1)
       .addTable([
         [{ data: 'Field', header: true }, { data: 'Value', header: true }],
         ['Repository', repoData.full_name],
@@ -32050,7 +32087,7 @@ async function run() {
         ['Suggestions', String(result.suggestions || 0)],
         ['Passed Checks', String(result.passed || 0)]
       ])
-      .addHeading('View Full Results', 2)
+      .addHeading(' View Full Results', 2)
       .addLink('View Full Scan Results on Pervaziv Console →', fullConsoleUrl)
       .write();
 
