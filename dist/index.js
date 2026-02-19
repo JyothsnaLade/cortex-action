@@ -31859,17 +31859,19 @@ async function run() {
       prNumber = context.payload.pull_request.number;
       branch = context.payload.pull_request.head.ref;
 
-    } else if (eventName === 'pull_request' && action === 'closed' && context.payload.pull_request.merged) {
-      triggerType = 'pr_merged';
-      prNumber = context.payload.pull_request.number;
-      branch = context.payload.pull_request.head.ref;
-
-    } else if (eventName === 'issue_comment' && action === 'created') {
+   } else if (eventName === 'issue_comment' && action === 'created') {
       const comment = context.payload.comment.body.trim();
-      console.log(`Comment received: "${comment}"`);
+      const isBot = context.payload.comment.user.type === 'Bot';
+      console.log(`Comment received: "${comment}" from ${context.payload.comment.user.login}`);
+
+      // skip if comment is from a bot
+      if (isBot) {
+        console.log('Comment is from a bot. Skipping.');
+        return;
+      }
 
       // case insensitive check
-      if (!comment.toLowerCase().includes('/cortex code review')) {
+      if (!comment.includes('/Cortex Code review')) {
         console.log('Comment does not match trigger. Skipping.');
         return;
       }
