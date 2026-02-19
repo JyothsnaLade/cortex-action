@@ -124,23 +124,23 @@ async function run() {
     }
 
     // Write initial job summary — scan started
-    await core.summary
-      .addHeading('🔍 Cortex Code Review', 1)
-      .addTable([
-        [{ data: 'Field', header: true }, { data: 'Value', header: true }],
-        ['Repository', repoData.full_name],
-        ['Branch', branch],
-        ['PR', `#${prNumber}`],
-        ['Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
-        ['Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
-        ['Files Changed', String(changedFiles.length)],
-        ['Trigger', triggerType]
-      ])
-      .addHeading('⏳ Scan Status', 2)
-      .addRaw('Scan has been submitted to Pervaziv. Please wait for results...')
-      .write();
+    // await core.summary
+    //   .addHeading('Cortex Code Review', 1)
+    //   .addTable([
+    //     [{ data: 'Field', header: true }, { data: 'Value', header: true }],
+    //     ['Repository', repoData.full_name],
+    //     ['Branch', branch],
+    //     ['PR', `#${prNumber}`],
+    //     ['Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
+    //     ['Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
+    //     ['Files Changed', String(changedFiles.length)],
+    //     ['Trigger', triggerType]
+    //   ])
+    //   .addHeading('Scan Status', 2)
+    //   .addRaw('Scan has been submitted to Pervaziv. Please wait for results...')
+    //   .write();
 
-    console.log(`Calling Pervaziv backend for PR #${prNumber}...`);
+    // console.log(`Calling Pervaziv backend for PR #${prNumber}...`);
 
     // Call backend
     const response = await fetch(backendUrl, {
