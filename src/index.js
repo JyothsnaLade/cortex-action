@@ -156,14 +156,15 @@ if (prNumber) {
         driver: {
           name: "Cortex Code Review",
            rules: [
-          {
-            id: "scan-summary",
-            shortDescription: { text: "Scan Summary" },
-            fullDescription: { 
-              text: `Critical: ${result.critical} | Warnings: ${result.warnings} | Suggestions: ${result.suggestions} | Passed: ${result.passed}` 
-            }
-          }
-        ]
+  {
+    id: "hardcoded-secret",
+    shortDescription: { text: "Hardcoded Secret" },
+    fullDescription: { 
+      text: `Hardcoded secret found. Critical: ${result.critical} | Warnings: ${result.warnings} | Suggestions: ${result.suggestions} | Passed: ${result.passed}` 
+    },
+    helpUri: "https://console.pervaziv.com"
+  }
+]
         }
       },
       results: result.issues.map(issue => ({
