@@ -31854,45 +31854,18 @@ async function run() {
     let prNumber;
     let branch;
 
-    if (eventName === 'pull_request' && action === 'opened') {
-      triggerType = 'pr_opened';
-      prNumber = context.payload.pull_request.number;
-      branch = context.payload.pull_request.head.ref;
+    if (eventName === 'push') {
+  triggerType = 'push_to_main';
+  branch = context.ref.replace('refs/heads/', '');
 
-   } else if (eventName === 'issue_comment' && action === 'created') {
-      const comment = context.payload.comment.body.trim();
-      const isBot = context.payload.comment.user.type === 'Bot';
-      console.log(`Comment received: "${comment}" from ${context.payload.comment.user.login}`);
+} else if (eventName === 'schedule') {
+  triggerType = 'scheduled_scan';
+  branch = 'main';
 
-      // skip if comment is from a bot
-      if (isBot) {
-        console.log('Comment is from a bot. Skipping.');
-        return;
-      }
-
-      // case insensitive check
-      if (!comment.includes('/Cortex Code review')) {
-        console.log('Comment does not match trigger. Skipping.');
-        return;
-      }
-      if (!context.payload.issue.pull_request) {
-        console.log('Comment is not on a PR. Skipping.');
-        return;
-      }
-      triggerType = 'manual_comment';
-      prNumber = context.payload.issue.number;
-
-      const { data: pr } = await octokit.rest.pulls.get({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        pull_number: prNumber
-      });
-      branch = pr.head.ref;
-
-    } else {
-      console.log('Event not handled. Skipping.');
-      return;
-    }
+} else {
+  console.log('Event not handled. Skipping.');
+  return;
+}
 
     // Fetch changed files
     const { data: files } = await octokit.rest.pulls.listFiles({
@@ -31958,7 +31931,6 @@ async function run() {
         created_at: userData.created_at
       };
     }
-
     // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
@@ -32018,7 +31990,15 @@ async function run() {
       tool: {
         driver: {
           name: "Cortex Code Review",
-          rules: []
+           rules: [
+          {
+            id: "scan-summary",
+            shortDescription: { text: "Scan Summary" },
+            fullDescription: { 
+              text: `Critical: ${result.critical} | Warnings: ${result.warnings} | Suggestions: ${result.suggestions} | Passed: ${result.passed}` 
+            }
+          }
+        ]
         }
       },
       results: result.issues.map(issue => ({
