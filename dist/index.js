@@ -31854,33 +31854,34 @@ async function run() {
     let prNumber;
     let branch;
 
-    if (eventName === 'push') {
+if (eventName === 'push') {
   triggerType = 'push_to_main';
   branch = context.ref.replace('refs/heads/', '');
+  prNumber = null; // no PR for push event
 
 } else if (eventName === 'schedule') {
   triggerType = 'scheduled_scan';
   branch = 'main';
-
-} else {
-  console.log('Event not handled. Skipping.');
-  return;
+  prNumber = null; // no PR for scheduled scan
 }
 
-    // Fetch changed files
-    const { data: files } = await octokit.rest.pulls.listFiles({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      pull_number: prNumber
-    });
+let changedFiles = [];
 
-    const changedFiles = files.map(f => ({
-      filename: f.filename,
-      status: f.status,
-      additions: f.additions,
-      deletions: f.deletions,
-      patch: f.patch
-    }));
+if (prNumber) {
+  // only fetch changed files if there's a PR
+  const { data: files } = await octokit.rest.pulls.listFiles({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    pull_number: prNumber
+  });
+  changedFiles = files.map(f => ({
+    filename: f.filename,
+    status: f.status,
+    additions: f.additions,
+    deletions: f.deletions,
+    patch: f.patch
+  }));
+}
 
     // Fetch triggered user details
     const { data: triggerUser } = await octokit.rest.users.getByUsername({
