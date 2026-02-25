@@ -6,7 +6,7 @@ async function run() {
     const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
     const context = github.context;
-    const backendUrl = 'https://trudi-synoptistic-meanspiritedly.ngrok-free.dev/runBotScan';;
+    const backendUrl = core.getInput('backend-url') || 'https://api.pervaziv.com/runBotScan';
     const consoleUrl = core.getInput('console-url');
 
     const eventName = context.eventName;
@@ -19,32 +19,36 @@ async function run() {
     let branch;
 
     if (eventName === 'push') {
-  triggerType = 'push_to_main';
-  branch = context.ref.replace('refs/heads/', '');
+      triggerType = 'push_to_main';
+      branch = context.ref.replace('refs/heads/', '');
+      prNumber = null;
 
-} else if (eventName === 'schedule') {
-  triggerType = 'scheduled_scan';
-  branch = 'main';
+    } else if (eventName === 'schedule') {
+      triggerType = 'scheduled_scan';
+      branch = 'main';
+      prNumber = null;
 
-} else {
-  console.log('Event not handled. Skipping.');
-  return;
-}
+    } else {
+      console.log('Event not handled. Skipping.');
+      return;
+    }
 
-    // Fetch changed files
-    const { data: files } = await octokit.rest.pulls.listFiles({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      pull_number: prNumber
-    });
+    let changedFiles = [];
 
-    const changedFiles = files.map(f => ({
-      filename: f.filename,
-      status: f.status,
-      additions: f.additions,
-      deletions: f.deletions,
-      patch: f.patch
-    }));
+    if (prNumber) {
+      const { data: files } = await octokit.rest.pulls.listFiles({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: prNumber
+      });
+      changedFiles = files.map(f => ({
+        filename: f.filename,
+        status: f.status,
+        additions: f.additions,
+        deletions: f.deletions,
+        patch: f.patch
+      }));
+    }
 
     // Fetch triggered user details
     const { data: triggerUser } = await octokit.rest.users.getByUsername({
@@ -95,6 +99,7 @@ async function run() {
         created_at: userData.created_at
       };
     }
+
     // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
@@ -106,7 +111,7 @@ async function run() {
         repository: `${context.repo.owner}/${context.repo.repo}`,
         branch: branch,
         commit: context.sha,
-        pr_number: String(prNumber),
+        pr_number: prNumber ? String(prNumber) : undefined,
         changed_files: changedFiles,
         triggered_by: {
           login: triggerUser.login,
@@ -137,6 +142,11 @@ async function run() {
     }
 
     const result = await response.json();
+    let totalFindings = 0;
+
+    if (result.chunked_result) {
+      totalFindings = result.chunked_result.length;
+    }
 
     // Build console URL from backend response
     let fullConsoleUrl = consoleUrl || 'https://console.pervaziv.com';
@@ -146,82 +156,116 @@ async function run() {
       fullConsoleUrl = `${fullConsoleUrl}/scans/${result.scan_id}`;
     }
 
-    // Upload SARIF to Security tab
-    if (result.issues && result.issues.length > 0) {
-  const sarif = {
-    version: "2.1.0",
-    runs: [{
-      tool: {
-        driver: {
-          name: "Cortex Code Review",
-           rules: [
-          {
-            id: "scan-summary",
-            shortDescription: { text: "Scan Summary" },
-            fullDescription: { 
-              text: `Critical: ${result.critical} | Warnings: ${result.warnings} | Suggestions: ${result.suggestions} | Passed: ${result.passed}` 
-            }
-          }
-        ]
+    // SARIF upload to Security tab
+    if (result.chunked_result && result.chunked_result.length > 0) {
+
+      function mapSeverity(impact) {
+        switch ((impact || "").toLowerCase()) {
+          case "critical":
+          case "high":
+            return "error";
+          case "medium":
+            return "warning";
+          case "low":
+            return "note";
+          default:
+            return "warning";
         }
-      },
-      results: result.issues.map(issue => ({
-        ruleId: issue.rule_id,
-        message: { text: issue.message },
-        level: issue.severity,
-        locations: [{
-          physicalLocation: {
-            artifactLocation: { uri: issue.filename },
-            region: { startLine: issue.line }
-          }
+      }
+
+      const rulesMap = {};
+      const results = [];
+
+      result.chunked_result.forEach(finding => {
+
+        let ruleId = Array.isArray(finding.vulnerability_class)
+          ? finding.vulnerability_class[0]
+          : finding.vulnerability_class;
+
+        ruleId = ruleId.toLowerCase().replace(/\s+/g, '-');
+
+        if (!rulesMap[ruleId]) {
+          rulesMap[ruleId] = {
+            id: ruleId,
+            shortDescription: { text: ruleId },
+            fullDescription: { text: finding.analysis },
+            properties: {
+              tags: [
+                ...(finding.cwe || []),
+                ...(finding.owasp || [])
+              ]
+            }
+          };
+        }
+
+        results.push({
+          ruleId: ruleId,
+          level: mapSeverity(finding.impact),
+          message: { text: finding.analysis },
+          locations: [{
+            physicalLocation: {
+              artifactLocation: { uri: finding.path },
+              region: {
+                startLine: finding.start_line,
+                endLine: finding.end_line
+              }
+            }
+          }]
+        });
+      });
+
+      const sarif = {
+        version: "2.1.0",
+        runs: [{
+          tool: {
+            driver: {
+              name: "Cortex Code Review",
+              rules: Object.values(rulesMap)
+            }
+          },
+          results: results
         }]
-      }))
-    }]
-  };
+      };
 
-  // GitHub requires gzip compressed then Base64 encoded SARIF
-  const zlib = require('zlib');
-  const sarifGzipped = zlib.gzipSync(JSON.stringify(sarif));
-  const sarifBase64 = sarifGzipped.toString('base64');
+      const zlib = require('zlib');
+      const sarifGzipped = zlib.gzipSync(JSON.stringify(sarif));
+      const sarifBase64 = sarifGzipped.toString('base64');
 
- await octokit.rest.codeScanning.uploadSarif({
-  owner: context.repo.owner,
-  repo: context.repo.repo,
-  commit_sha: context.sha,
-  ref: `refs/heads/${repoData.default_branch}`,  //use main/default branch
-  sarif: sarifBase64,
-  tool_name: 'Cortex Code Review'
-});
-  console.log('SARIF uploaded to Security tab successfully');
-}
-     
+      await octokit.rest.codeScanning.uploadSarif({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        commit_sha: context.sha,
+        ref: `refs/heads/${repoData.default_branch}`,
+        sarif: sarifBase64,
+        tool_name: 'Cortex Code Review'
+      });
 
-    // Update job summary with scan results
+      console.log('SARIF uploaded to Security tab successfully');
+    }
+
+    // Job summary
     await core.summary
-      .addHeading('Cortex Code Review', 1)
+      .addHeading('🔍 Cortex Code Review', 1)
       .addTable([
         [{ data: 'Field', header: true }, { data: 'Value', header: true }],
         ['Repository', repoData.full_name],
         ['Branch', branch],
-        ['PR', `#${prNumber}`],
+        ['Trigger', triggerType],
         ['Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
         ['Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
-        ['Files Changed', String(changedFiles.length)],
-        ['Trigger', triggerType]
+        ...(prNumber ? [['PR', `#${prNumber}`]] : []),
+        ...(changedFiles.length > 0 ? [['Files Changed', String(changedFiles.length)]] : []),
       ])
-      .addHeading('Scan Results', 2)
+      .addHeading('📊 Scan Results', 2)
       .addTable([
         [{ data: 'Metric', header: true }, { data: 'Count', header: true }],
-        ['Critical Issues', String(result.critical || 0)],
-        ['Warnings', String(result.warnings || 0)],
-        ['Suggestions', String(result.suggestions || 0)],
-        ['Passed Checks', String(result.passed || 0)]
+        ['Total Findings', String(totalFindings)]
       ])
-      .addHeading(' View Full Results', 2)
+      .addHeading('🔗 View Full Results', 2)
       .addLink('View Full Scan Results on Pervaziv Console →', fullConsoleUrl)
       .write();
 
-    console.log(`Scan complete. Results: ${JSON.stringify(result)}`);
+    console.log(`Scan complete. Total findings: ${totalFindings}`);
     console.log(`Console URL: ${fullConsoleUrl}`);
 
   } catch (error) {
