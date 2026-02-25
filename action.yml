@@ -2,10 +2,14 @@ name: Cortex Code Review
 description: Send PR info to Cortex backend
 
 inputs:
+  backend-url:
+    description: Pervaziv backend URL
+    required: false
+    default: 'https://YOUR-NGROK-URL.ngrok-free.app/runBotScan'
   console-url:
     description: Pervaziv console URL
     required: false
-    default: 'https://trudi-synoptistic-meanspiritedly.ngrok-free.dev'
+    default: 'https://console.pervaziv.com'
 
 runs:
   using: node20
