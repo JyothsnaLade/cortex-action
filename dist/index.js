@@ -31868,23 +31868,6 @@ if (eventName === 'push') {
       return;
     }
 
-let changedFiles = [];
-
-if (prNumber) {
-  const { data: files } = await octokit.rest.pulls.listFiles({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    pull_number: prNumber
-  });
-  changedFiles = files.map(f => ({
-    filename: f.filename,
-    status: f.status,
-    additions: f.additions,
-    deletions: f.deletions,
-    patch: f.patch
-  }));
-}
-
     // Fetch triggered user details
     const { data: triggerUser } = await octokit.rest.users.getByUsername({
       username: context.actor
@@ -32049,7 +32032,6 @@ if (prNumber) {
         ['Triggered by', `${triggerUser.name || triggerUser.login} (${triggerUser.email || 'email not public'})`],
         ['Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
         ...(prNumber ? [['PR', `#${prNumber}`]] : []),
-        ...(changedFiles.length > 0 ? [['Files Changed', String(changedFiles.length)]] : []),
         ...(result.ai_score ? [['AI Risk Score', String(result.ai_score)]] : []),
         ...(result.commit_id ? [['Commit ID', result.commit_id]] : []),
       ])
