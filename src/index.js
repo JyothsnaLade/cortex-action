@@ -143,6 +143,10 @@ if (prNumber) {
             shortDescription: { text: finding.vulnerability_class || ruleId },
             fullDescription: { text: finding.analysis },
             helpUri: fullConsoleUrl,
+            help: {
+            text: `View full report: ${fullConsoleUrl}`,
+            markdown: `[View Full Report on Pervaziv Console](${fullConsoleUrl})`
+            },
             properties: {
               tags: [
                 ...(finding.cwe ? [finding.cwe] : []),
