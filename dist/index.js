@@ -31836,13 +31836,12 @@ module.exports = parseParams
 var __webpack_exports__ = {};
 const core = __nccwpck_require__(7484);
 const github = __nccwpck_require__(3228);
-
 async function run() {
   try {
     const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
     const context = github.context;
-    const backendUrl = core.getInput('backend-url') || 'https://api.pervaziv.com/runBotScan';
+    const backendUrl = core.getInput('backend-url') || 'https://api.pervaziv.com/handleGitAction';
     const consoleUrl = core.getInput('console-url');
 
     const eventName = context.eventName;
@@ -31854,37 +31853,37 @@ async function run() {
     let prNumber;
     let branch;
 
-    if (eventName === 'push') {
-      triggerType = 'push_to_main';
-      branch = context.ref.replace('refs/heads/', '');
-      prNumber = null;
+if (eventName === 'push') {
+  triggerType = 'push_to_main';
+  branch = context.ref.replace('refs/heads/', '');
+  prNumber = null; // no PR for push event
 
-    } else if (eventName === 'schedule') {
-      triggerType = 'scheduled_scan';
-      branch = 'main';
-      prNumber = null;
+} else if (eventName === 'schedule') {
+  triggerType = 'scheduled_scan';
+  branch = 'main';
+  prNumber = null; // no PR for scheduled scan
 
     } else {
       console.log('Event not handled. Skipping.');
       return;
     }
 
-    let changedFiles = [];
+let changedFiles = [];
 
-    if (prNumber) {
-      const { data: files } = await octokit.rest.pulls.listFiles({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        pull_number: prNumber
-      });
-      changedFiles = files.map(f => ({
-        filename: f.filename,
-        status: f.status,
-        additions: f.additions,
-        deletions: f.deletions,
-        patch: f.patch
-      }));
-    }
+if (prNumber) {
+  const { data: files } = await octokit.rest.pulls.listFiles({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    pull_number: prNumber
+  });
+  changedFiles = files.map(f => ({
+    filename: f.filename,
+    status: f.status,
+    additions: f.additions,
+    deletions: f.deletions,
+    patch: f.patch
+  }));
+}
 
     // Fetch triggered user details
     const { data: triggerUser } = await octokit.rest.users.getByUsername({
@@ -31935,40 +31934,19 @@ async function run() {
         created_at: userData.created_at
       };
     }
-
     // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json',
+        'provider': 'github',
+        'id': String(repoData.owner.id),
+        'accesstoken': token,
+        'email': ownerDetails.email || ''
+      },
       body: JSON.stringify({
-        trigger_type: triggerType,
-        provider: 'github',
-        github_token: token,
-        repository: `${context.repo.owner}/${context.repo.repo}`,
-        branch: branch,
-        commit: context.sha,
-        pr_number: prNumber ? String(prNumber) : undefined,
-        changed_files: changedFiles,
-        triggered_by: {
-          login: triggerUser.login,
-          name: triggerUser.name,
-          email: triggerUser.email,
-          avatar_url: triggerUser.avatar_url,
-          profile_url: triggerUser.html_url,
-          company: triggerUser.company
-        },
-        repo: {
-          name: repoData.name,
-          full_name: repoData.full_name,
-          description: repoData.description,
-          private: repoData.private,
-          default_branch: repoData.default_branch,
-          language: repoData.language,
-          stars: repoData.stargazers_count,
-          forks: repoData.forks_count,
-          created_at: repoData.created_at
-        },
-        owner: ownerDetails
+        project_url: `https://github.com/${context.repo.owner}/${context.repo.repo}`,
+        branch_name: branch,
+        email: ownerDetails.email || ''
       })
     });
 
@@ -31978,57 +31956,33 @@ async function run() {
     }
 
     const result = await response.json();
-    let totalFindings = 0;
-
-    if (result.chunked_result) {
-      totalFindings = result.chunked_result.length;
-    }
+    const report = result.report;
+    const chunkedResult = report ? report.chunked_result : null;
+    let totalFindings = chunkedResult ? chunkedResult.length : 0;
 
     // Build console URL from backend response
-    let fullConsoleUrl = consoleUrl || 'https://console.pervaziv.com';
-    if (result.scan_url) {
-      fullConsoleUrl = result.scan_url;
-    } else if (result.scan_id) {
-      fullConsoleUrl = `${fullConsoleUrl}/scans/${result.scan_id}`;
-    }
+    let fullConsoleUrl = result.security_report_url || consoleUrl || 'https://console.pervaziv.com';
 
-    // SARIF upload to Security tab
-    if (result.chunked_result && result.chunked_result.length > 0) {
-
-      function mapSeverity(impact) {
-        switch ((impact || "").toLowerCase()) {
-          case "critical":
-          case "high":
-            return "error";
-          case "medium":
-            return "warning";
-          case "low":
-            return "note";
-          default:
-            return "warning";
-        }
-      }
-
+    // Upload SARIF to Security tab
+    if (chunkedResult && chunkedResult.length > 0) {
       const rulesMap = {};
       const results = [];
 
-      result.chunked_result.forEach(finding => {
+      chunkedResult.forEach(finding => {
 
-        let ruleId = Array.isArray(finding.vulnerability_class)
-          ? finding.vulnerability_class[0]
-          : finding.vulnerability_class;
-
+        let ruleId = finding.vulnerability_class || 'unknown';
         ruleId = ruleId.toLowerCase().replace(/\s+/g, '-');
 
         if (!rulesMap[ruleId]) {
           rulesMap[ruleId] = {
             id: ruleId,
-            shortDescription: { text: ruleId },
+            shortDescription: { text: finding.vulnerability_class || ruleId },
             fullDescription: { text: finding.analysis },
+            helpUri: fullConsoleUrl,
             properties: {
               tags: [
-                ...(finding.cwe || []),
-                ...(finding.owasp || [])
+                ...(finding.cwe ? [finding.cwe] : []),
+                ...(finding.owasp ? [finding.owasp] : [])
               ]
             }
           };
@@ -32036,7 +31990,7 @@ async function run() {
 
         results.push({
           ruleId: ruleId,
-          level: mapSeverity(finding.impact),
+          level: (finding.severity || 'warning').toLowerCase(),
           message: { text: finding.analysis },
           locations: [{
             physicalLocation: {
@@ -32063,25 +32017,26 @@ async function run() {
         }]
       };
 
-      const zlib = __nccwpck_require__(3106);
-      const sarifGzipped = zlib.gzipSync(JSON.stringify(sarif));
-      const sarifBase64 = sarifGzipped.toString('base64');
+  // GitHub requires gzip compressed then Base64 encoded SARIF
+  const zlib = __nccwpck_require__(3106);
+  const sarifGzipped = zlib.gzipSync(JSON.stringify(sarif));
+  const sarifBase64 = sarifGzipped.toString('base64');
 
-      await octokit.rest.codeScanning.uploadSarif({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        commit_sha: context.sha,
-        ref: `refs/heads/${repoData.default_branch}`,
-        sarif: sarifBase64,
-        tool_name: 'Cortex Code Review'
-      });
+ await octokit.rest.codeScanning.uploadSarif({
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  commit_sha: context.sha,
+  ref: `refs/heads/${repoData.default_branch}`,  //use main/default branch
+  sarif: sarifBase64,
+  tool_name: 'Cortex Code Review'
+});
+  console.log('SARIF uploaded to Security tab successfully');
+}
+     
 
-      console.log('SARIF uploaded to Security tab successfully');
-    }
-
-    // Job summary
+    // Update job summary with scan results
     await core.summary
-      .addHeading('🔍 Cortex Code Review', 1)
+      .addHeading('Cortex Code Review', 1)
       .addTable([
         [{ data: 'Field', header: true }, { data: 'Value', header: true }],
         ['Repository', repoData.full_name],
@@ -32091,13 +32046,15 @@ async function run() {
         ['Owner', `${ownerDetails.name || ownerDetails.login} (${ownerDetails.type})`],
         ...(prNumber ? [['PR', `#${prNumber}`]] : []),
         ...(changedFiles.length > 0 ? [['Files Changed', String(changedFiles.length)]] : []),
+        ...(result.ai_score ? [['AI Risk Score', String(result.ai_score)]] : []),
+        ...(result.commit_id ? [['Commit ID', result.commit_id]] : []),
       ])
-      .addHeading('📊 Scan Results', 2)
+      .addHeading('Scan Results', 2)
       .addTable([
         [{ data: 'Metric', header: true }, { data: 'Count', header: true }],
         ['Total Findings', String(totalFindings)]
       ])
-      .addHeading('🔗 View Full Results', 2)
+      .addHeading(' View Full Results', 2)
       .addLink('View Full Scan Results on Pervaziv Console →', fullConsoleUrl)
       .write();
 
