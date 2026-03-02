@@ -31868,7 +31868,7 @@ async function run() {
       headers: {
         'Content-Type': 'application/json',
         'provider': 'github',
-        'access-token': token
+        'accesstoken': token
       },
       body: JSON.stringify({
         repository: `${context.repo.owner}/${context.repo.repo}`,
