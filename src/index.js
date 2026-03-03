@@ -104,7 +104,7 @@ if (context.eventName === 'push') {
   owner: context.repo.owner,
   repo: context.repo.repo,
   commit_sha: context.sha,
-  ref: `refs/heads/${repoData.default_branch}`,  //use main/default branch
+  ref: context.ref,
   sarif: sarifBase64,
   tool_name: 'Cortex Code Review'
 });
