@@ -1,44 +1,86 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
 const zlib = require('zlib');
-
 async function run() {
   try {
     const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
     const context = github.context;
+    const backendUrl = core.getInput('backend-url') || 'https://api.pervaziv.com/handleGitAction';
 
-    const backendUrl =
-      core.getInput('backend-url') ||
-      'https://api.pervaziv.com/handleGitAction';
-
-    let branch;
     let triggerType;
+    let branch;
 
-    if (context.eventName === 'push') {
-      branch = context.ref.replace('refs/heads/', '');
-      triggerType = 'push_to_main';
-    } else if (context.eventName === 'schedule') {
-      branch = 'main';
-      triggerType = 'scheduled_scan';
+if (context.eventName === 'push') {
+  triggerType = 'push_to_main';
+  branch = context.ref.replace('refs/heads/', '');
+
+} else if (context.eventName === 'schedule') {
+  triggerType = 'scheduled_scan';
+  branch = 'main';
+
     } else {
       console.log('Event not handled. Skipping.');
       return;
     }
 
-    // 🔹 Call backend (minimal payload)
+    // Fetch repo details
+    const { data: repoData } = await octokit.rest.repos.get({
+      owner: context.repo.owner,
+      repo: context.repo.repo
+    });
+
+    // Fetch repo owner (org or user)
+    let ownerDetails;
+    try {
+      const { data: orgData } = await octokit.rest.orgs.get({
+        org: context.repo.owner
+      });
+      ownerDetails = {
+        type: 'organization',
+        login: orgData.login,
+        name: orgData.name,
+        email: orgData.email,
+        avatar_url: orgData.avatar_url,
+        profile_url: orgData.html_url,
+        description: orgData.description,
+        location: orgData.location,
+        blog: orgData.blog,
+        public_repos: orgData.public_repos,
+        created_at: orgData.created_at
+      };
+    } catch (e) {
+      const { data: userData } = await octokit.rest.users.getByUsername({
+        username: context.repo.owner
+      });
+      ownerDetails = {
+        type: 'user',
+        login: userData.login,
+        name: userData.name,
+        email: userData.email,
+        avatar_url: userData.avatar_url,
+        profile_url: userData.html_url,
+        company: userData.company,
+        blog: userData.blog,
+        location: userData.location,
+        bio: userData.bio,
+        public_repos: userData.public_repos,
+        created_at: userData.created_at
+      };
+    }
+    // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+      headers: { 'Content-Type': 'application/json',
         'provider': 'github',
-        'accesstoken': token
+        'id': String(repoData.owner.id),
+        'accesstoken': token,
+        'email': ownerDetails.email || ''
       },
       body: JSON.stringify({
-        repository: `${context.repo.owner}/${context.repo.repo}`,
-        branch: branch,
-        commit: context.sha,
-        trigger_type: triggerType
+        project_url: `https://github.com/${context.repo.owner}/${context.repo.repo}`,
+        branch_name: branch,
+        email: ownerDetails.email || ''
       })
     });
 
@@ -49,24 +91,27 @@ async function run() {
 
     const result = await response.json();
 
+    // FULL SARIF from backend
     if (!result.sarif) {
       throw new Error('Backend did not return SARIF object');
     }
 
-    // 🔹 Compress + Upload SARIF
+    // Upload SARIF directly (no transformation)
     const sarifGzipped = zlib.gzipSync(JSON.stringify(result.sarif));
     const sarifBase64 = sarifGzipped.toString('base64');
 
-    await octokit.rest.codeScanning.uploadSarif({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      commit_sha: context.sha,
-      ref: context.ref,
-      sarif: sarifBase64,
-      tool_name: 'Cortex Code Review'
-    });
+ await octokit.rest.codeScanning.uploadSarif({
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  commit_sha: context.sha,
+  ref: `refs/heads/${repoData.default_branch}`,  //use main/default branch
+  sarif: sarifBase64,
+  tool_name: 'Cortex Code Review'
+});
+  console.log('SARIF uploaded to Security tab successfully');
 
-    // 🔹 Summary
+     
+    // Update job summary with scan results
     await core.summary
       .addHeading('Cortex Code Review', 1)
       .addTable([
@@ -76,13 +121,13 @@ async function run() {
         ['Trigger', triggerType],
         ['Total Findings', String(result.total_findings || 0)]
       ])
-      .addLink(
-        'View Full Scan Results →',
+      .addLink('View Full Scan Results on Pervaziv Console →',
         result.security_report_url || 'https://console.pervaziv.com'
       )
       .write();
 
-    console.log('SARIF uploaded successfully.');
+    console.log(`Scan complete. Total findings: ${result.total_findings}`);
+
 
   } catch (error) {
     await core.summary
@@ -93,4 +138,5 @@ async function run() {
     core.setFailed(error.message);
   }
 }
+
 run();
