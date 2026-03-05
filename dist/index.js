@@ -29922,6 +29922,14 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
+/***/ 6595:
+/***/ ((module) => {
+
+module.exports = eval("require")("@octokit/rest");
+
+
+/***/ }),
+
 /***/ 2613:
 /***/ ((module) => {
 
@@ -31846,10 +31854,18 @@ async function run() {
     const backendUrl =
       core.getInput('backend-url') ||
       'https://console.pervaziv.com/handleGitAction';
-      const { data: tokenUser } = await octokit.rest.users.getAuthenticated();
-console.log('Token belongs to:', tokenUser.login);
-console.log('Token user ID:', tokenUser.id);
-
+      
+    // TEST — check if GET /user works with GITHUB_TOKEN
+try {
+  const { Octokit } = __nccwpck_require__(6595);
+  const authCheck = new Octokit({ auth: token });
+  const ghResp = await authCheck.request('GET /user');
+  console.log('GET /user status:', ghResp.status);
+  console.log('GET /user login:', ghResp.data.login);
+  console.log('GET /user id:', ghResp.data.id);
+} catch (err) {
+  console.log('GET /user failed:', err.message);
+}
     let triggerType;
     let branch;
 
