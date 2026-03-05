@@ -10,6 +10,9 @@ async function run() {
     const backendUrl =
       core.getInput('backend-url') ||
       'https://console.pervaziv.com/handleGitAction';
+      const { data: tokenUser } = await octokit.rest.users.getAuthenticated();
+console.log('Token belongs to:', tokenUser.login);
+console.log('Token user ID:', tokenUser.id);
 
     let triggerType;
     let branch;
@@ -72,12 +75,6 @@ async function run() {
         created_at: userData.created_at
       };
     }
-
-console.log("provider:", "github");
-console.log("provider id:", repoData.owner.login);
-console.log("token:", token);
-console.log("email:", ownerDetails.email);
-console.log("name", ownerDetails.name);
     // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
