@@ -10,12 +10,10 @@ async function run() {
     const backendUrl =
       core.getInput('backend-url') ||
       'https://console.pervaziv.com/handleGitAction';
-      
+
     // TEST — check if GET /user works with GITHUB_TOKEN
 try {
-  const { Octokit } = require('@octokit/rest');
-  const authCheck = new Octokit({ auth: token });
-  const ghResp = await authCheck.request('GET /user');
+  const ghResp = await octokit.request('GET /user');
   console.log('GET /user status:', ghResp.status);
   console.log('GET /user login:', ghResp.data.login);
   console.log('GET /user id:', ghResp.data.id);
