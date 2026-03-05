@@ -74,7 +74,7 @@ async function run() {
     }
 
 console.log("provider:", "github");
-console.log("provider id:", repoData.owner.id);
+console.log("provider id:", repoData.owner.login);
 console.log("token:", token);
 console.log("email:", ownerDetails.email);
 console.log("name", ownerDetails.name);
@@ -84,7 +84,7 @@ console.log("name", ownerDetails.name);
       headers: {
         'Content-Type': 'application/json',
         provider: 'github',
-        id: String(repoData.owner.id),
+        id: String(repoData.owner.login),
         accesstoken: token,
         email: ownerDetails.email || ''
       },
