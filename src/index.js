@@ -7,7 +7,9 @@ async function run() {
     const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
     const context = github.context;
-    const backendUrl = core.getInput('backend-url') || 'https://console.pervaziv.com/handleGitAction';
+    const backendUrl =
+      core.getInput('backend-url') ||
+      'https://console.pervaziv.com/handleGitAction';
 
     let triggerType;
     let branch;
@@ -93,19 +95,19 @@ async function run() {
       const responseText = await response.text();
       let errorMessage = `Backend responded with ${response.status}`;
 
-    try {
-      const errorData = JSON.parse(responseText);
-      if (errorData && errorData.error) {
-        errorMessage = `Backend responded with ${response.status}: ${errorData.error}`;
-     }
-    } catch {
-      if (responseText) {
-        errorMessage = `Backend responded with ${response.status}: ${responseText}`;
-     }
-   }
+      try {
+        const errorData = JSON.parse(responseText);
+        if (errorData && errorData.error) {
+          errorMessage = `Backend responded with ${response.status}: ${errorData.error}`;
+        }
+      } catch {
+        if (responseText) {
+          errorMessage = `Backend responded with ${response.status}: ${responseText}`;
+        }
+      }
 
-   throw new Error(errorMessage);
- }
+      throw new Error(errorMessage);
+    }
 
     const result = await response.json();
 
