@@ -31926,22 +31926,22 @@ async function run() {
 
     // Improved backend error handling
     if (!response.ok) {
+      const responseText = await response.text();
       let errorMessage = `Backend responded with ${response.status}`;
 
-      try {
-        const errorData = await response.json();
-        if (errorData && errorData.error) {
-          errorMessage = `Backend responded with ${response.status}: ${errorData.error}`;
-        }
-      } catch (e) {
-        const errorText = await response.text();
-        if (errorText) {
-          errorMessage = `Backend responded with ${response.status}: ${errorText}`;
-        }
-      }
+    try {
+      const errorData = JSON.parse(responseText);
+      if (errorData && errorData.error) {
+        errorMessage = `Backend responded with ${response.status}: ${errorData.error}`;
+     }
+    } catch {
+      if (responseText) {
+        errorMessage = `Backend responded with ${response.status}: ${responseText}`;
+     }
+   }
 
-      throw new Error(errorMessage);
-    }
+   throw new Error(errorMessage);
+ }
 
     const result = await response.json();
 
