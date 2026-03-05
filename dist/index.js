@@ -31845,7 +31845,7 @@ async function run() {
     const context = github.context;
     const backendUrl =
       core.getInput('backend-url') ||
-      'https://console.pervaziv.com/handleGitAction';
+      'https://console.pervaziv.com';
 
     let triggerType;
     let branch;
