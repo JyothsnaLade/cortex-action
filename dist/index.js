@@ -31847,15 +31847,6 @@ async function run() {
       core.getInput('backend-url') ||
       'https://console.pervaziv.com/handleGitAction';
 
-    // TEST — check if GET /user works with GITHUB_TOKEN
-try {
-  const ghResp = await octokit.request('GET /user');
-  console.log('GET /user status:', ghResp.status);
-  console.log('GET /user login:', ghResp.data.login);
-  console.log('GET /user id:', ghResp.data.id);
-} catch (err) {
-  console.log('GET /user failed:', err.message);
-}
     let triggerType;
     let branch;
 
@@ -31925,12 +31916,10 @@ try {
         provider: 'github',
         id: String(repoData.owner.login),
         accesstoken: token,
-        email: ownerDetails.email || ''
       },
       body: JSON.stringify({
         project_url: `https://github.com/${context.repo.owner}/${context.repo.repo}`,
         branch_name: branch,
-        email: ownerDetails.email || ''
       })
     });
 
