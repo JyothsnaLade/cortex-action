@@ -73,6 +73,11 @@ async function run() {
       };
     }
 
+console.log("provider:", "github");
+console.log("provider id:", repoData.owner.id);
+console.log("token:", token);
+console.log("email:", ownerDetails.email);
+console.log("-------------------------------------");
     // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
