@@ -1,41 +1,42 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
 const zlib = require('zlib');
+
 async function run() {
   try {
     const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
     const context = github.context;
-    const backendUrl = core.getInput('backend-url') || 'https://api.pervaziv.com/handleGitAction';
+    const backendUrl = core.getInput('backend-url') || 'https://console.pervaziv.com/handleGitAction';
 
     let triggerType;
     let branch;
 
-if (context.eventName === 'push') {
-  triggerType = 'push_to_main';
-  branch = context.ref.replace('refs/heads/', '');
-
-} else if (context.eventName === 'schedule') {
-  triggerType = 'scheduled_scan';
-  branch = 'main';
-
+    if (context.eventName === 'push') {
+      triggerType = 'push_to_main';
+      branch = context.ref.replace('refs/heads/', '');
+    } else if (context.eventName === 'schedule') {
+      triggerType = 'scheduled_scan';
+      branch = 'main';
     } else {
       console.log('Event not handled. Skipping.');
       return;
     }
 
-    // Fetch repo details
+    // Fetch repository details
     const { data: repoData } = await octokit.rest.repos.get({
       owner: context.repo.owner,
       repo: context.repo.repo
     });
 
-    // Fetch repo owner (org or user)
+    // Fetch repository owner details (org or user)
     let ownerDetails;
+
     try {
       const { data: orgData } = await octokit.rest.orgs.get({
         org: context.repo.owner
       });
+
       ownerDetails = {
         type: 'organization',
         login: orgData.login,
@@ -53,6 +54,7 @@ if (context.eventName === 'push') {
       const { data: userData } = await octokit.rest.users.getByUsername({
         username: context.repo.owner
       });
+
       ownerDetails = {
         type: 'user',
         login: userData.login,
@@ -68,14 +70,16 @@ if (context.eventName === 'push') {
         created_at: userData.created_at
       };
     }
+
     // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-        'provider': 'github',
-        'id': String(repoData.owner.id),
-        'accesstoken': token,
-        'email': ownerDetails.email || ''
+      headers: {
+        'Content-Type': 'application/json',
+        provider: 'github',
+        id: String(repoData.owner.id),
+        accesstoken: token,
+        email: ownerDetails.email || ''
       },
       body: JSON.stringify({
         project_url: `https://github.com/${context.repo.owner}/${context.repo.repo}`,
@@ -84,34 +88,48 @@ if (context.eventName === 'push') {
       })
     });
 
+    // Improved backend error handling
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Backend responded with ${response.status}: ${errorText}`);
+      let errorMessage = `Backend responded with ${response.status}`;
+
+      try {
+        const errorData = await response.json();
+        if (errorData && errorData.error) {
+          errorMessage = `Backend responded with ${response.status}: ${errorData.error}`;
+        }
+      } catch (e) {
+        const errorText = await response.text();
+        if (errorText) {
+          errorMessage = `Backend responded with ${response.status}: ${errorText}`;
+        }
+      }
+
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();
 
-    // FULL SARIF from backend
+    // Validate SARIF response
     if (!result.sarif) {
       throw new Error('Backend did not return SARIF object');
     }
 
-    // Upload SARIF directly (no transformation)
+    // Upload SARIF directly
     const sarifGzipped = zlib.gzipSync(JSON.stringify(result.sarif));
     const sarifBase64 = sarifGzipped.toString('base64');
 
- await octokit.rest.codeScanning.uploadSarif({
-  owner: context.repo.owner,
-  repo: context.repo.repo,
-  commit_sha: context.sha,
-  ref: context.ref,
-  sarif: sarifBase64,
-  tool_name: 'Cortex Code Review'
-});
-  console.log('SARIF uploaded to Security tab successfully');
+    await octokit.rest.codeScanning.uploadSarif({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      commit_sha: context.sha,
+      ref: context.ref,
+      sarif: sarifBase64,
+      tool_name: 'Cortex Code Review'
+    });
 
-     
-    // Update job summary with scan results
+    console.log('SARIF uploaded to Security tab successfully');
+
+    // Update job summary
     await core.summary
       .addHeading('Cortex Code Review', 1)
       .addTable([
@@ -121,14 +139,13 @@ if (context.eventName === 'push') {
         ['Trigger', triggerType],
         ['Total Findings', String(result.total_findings || 0)]
       ])
-      .addLink('View Full Scan Results on Pervaziv Console →',
+      .addLink(
+        'View Full Scan Results on Pervaziv Console →',
         result.security_report_url || 'https://console.pervaziv.com'
       )
       .write();
 
     console.log(`Scan complete. Total findings: ${result.total_findings}`);
-
-
   } catch (error) {
     await core.summary
       .addHeading('Cortex Code Review Failed', 1)
