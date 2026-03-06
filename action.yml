@@ -5,7 +5,7 @@ inputs:
   backend-url:
     description: Pervaziv backend URL
     required: false
-    default: 'https://trudi-synoptistic-meanspiritedly.ngrok-free.dev/runBotScan'
+    default: 'https://console.pervaziv.com/handleGitAction'
   console-url:
     description: Pervaziv console URL
     required: false

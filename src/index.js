@@ -8,9 +8,7 @@ async function run() {
     const octokit = github.getOctokit(token);
     const context = github.context;
     const backendUrl =
-      core.getInput('backend-url') ||
-      'https://console.pervaziv.com';
-    console.log(`Using backend URL: ${backendUrl}`);
+      core.getInput('backend-url')
 
     let triggerType;
     let branch;
