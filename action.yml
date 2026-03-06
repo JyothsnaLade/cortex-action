@@ -5,7 +5,7 @@ inputs:
   backend-url:
     description: Pervaziv backend URL
     required: false
-    default: 'https://console.pervaziv.com/handleGitAction'
+    default: 'https://console.pervaziv.com:8443/handleGitAction'
   console-url:
     description: Pervaziv console URL
     required: false
