@@ -31846,6 +31846,7 @@ async function run() {
     const backendUrl =
       core.getInput('backend-url') ||
       'https://console.pervaziv.com';
+    console.log(`Using backend URL: ${backendUrl}`);
 
     let triggerType;
     let branch;
