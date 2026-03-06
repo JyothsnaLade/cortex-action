@@ -31930,11 +31930,11 @@ async function run() {
       try {
         const errorData = JSON.parse(responseText);
         if (errorData && errorData.error) {
-          errorMessage = `Backend responded with ${response.status}: ${errorData.error}`;
+          errorMessage = `Backend responded with ${response.status}`;
         }
       } catch {
         if (responseText) {
-          errorMessage = `Backend responded with ${response.status}: ${responseText}`;
+          errorMessage = `Backend responded with ${response.status}`;
         }
       }
 
