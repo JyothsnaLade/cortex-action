@@ -31904,12 +31904,12 @@ async function run() {
       commit_sha: context.sha,
       ref: context.ref,
       sarif: sarifBase64,
-      tool_name: 'Cortex Code Review'
+      tool_name: 'Pervaziv AI Code Review'
     });
 
     // Update job summary
     await core.summary
-      .addHeading('Cortex Code Review', 1)
+      .addHeading('Pervaziv AI Code Review', 1)
       .addTable([
         [{ data: 'Field', header: true }, { data: 'Value', header: true }],
         ['Repository', `${context.repo.owner}/${context.repo.repo}`],
@@ -31925,7 +31925,7 @@ async function run() {
 
   } catch (error) {
     await core.summary
-      .addHeading('Cortex Code Review Failed', 1)
+      .addHeading('Pervaziv AI Code Review Failed', 1)
       .addRaw(`Error: ${error.message}`)
       .write();
 

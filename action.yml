@@ -1,6 +1,5 @@
-name: Cortex Code Review
-description: Send PR info to Cortex backend
-
+name: Pervaziv AI Code Review
+description: Security scanning that automatically analyzes your repository, displays vulnerabilities in the GitHub Security tab as code scanning alerts, and shows a detailed summary in the Actions tab with a link to the Pervaziv console.
 inputs:
   backend-url:
     description: Pervaziv backend URL
