@@ -31866,47 +31866,6 @@ async function run() {
       repo: context.repo.repo
     });
 
-    // Fetch repository owner details (org or user)
-    let ownerDetails;
-
-    try {
-      const { data: orgData } = await octokit.rest.orgs.get({
-        org: context.repo.owner
-      });
-
-      ownerDetails = {
-        type: 'organization',
-        login: orgData.login,
-        name: orgData.name,
-        email: orgData.email,
-        avatar_url: orgData.avatar_url,
-        profile_url: orgData.html_url,
-        description: orgData.description,
-        location: orgData.location,
-        blog: orgData.blog,
-        public_repos: orgData.public_repos,
-        created_at: orgData.created_at
-      };
-    } catch (e) {
-      const { data: userData } = await octokit.rest.users.getByUsername({
-        username: context.repo.owner
-      });
-
-      ownerDetails = {
-        type: 'user',
-        login: userData.login,
-        name: userData.name,
-        email: userData.email,
-        avatar_url: userData.avatar_url,
-        profile_url: userData.html_url,
-        company: userData.company,
-        blog: userData.blog,
-        location: userData.location,
-        bio: userData.bio,
-        public_repos: userData.public_repos,
-        created_at: userData.created_at
-      };
-    }
     // Call backend
     const response = await fetch(backendUrl, {
       method: 'POST',
@@ -31917,29 +31876,16 @@ async function run() {
         accesstoken: token,
       },
       body: JSON.stringify({
-        project_url: `https://github.com/${context.repo.owner}/${context.repo.repo}`,
+        project_url: repoData.clone_url,
         branch_name: branch,
       })
     });
+    console.log('project_url:', repoData.clone_url);
 
     // Improved backend error handling
     if (!response.ok) {
-      const responseText = await response.text();
-      let errorMessage = `Backend responded with ${response.status}`;
-
-      try {
-        const errorData = JSON.parse(responseText);
-        if (errorData && errorData.error) {
-          errorMessage = `Backend responded with ${response.status}`;
-        }
-      } catch {
-        if (responseText) {
-          errorMessage = `Backend responded with ${response.status}`;
-        }
-      }
-
-      throw new Error(errorMessage);
-    }
+      throw new Error(`Backend responded with ${response.status}`);
+}
 
     const result = await response.json();
 
@@ -31961,8 +31907,6 @@ async function run() {
       tool_name: 'Cortex Code Review'
     });
 
-    console.log('SARIF uploaded to Security tab successfully');
-
     // Update job summary
     await core.summary
       .addHeading('Cortex Code Review', 1)
@@ -31979,7 +31923,6 @@ async function run() {
       )
       .write();
 
-    console.log(`Scan complete. Total findings: ${result.total_findings}`);
   } catch (error) {
     await core.summary
       .addHeading('Cortex Code Review Failed', 1)
